@@ -13,6 +13,8 @@
 <p class="form">
   <label for="midifile">Upload a MIDI file</label>
   <input type="file" id="midifile" />
+  <label for="enableDevice">Connect MIDI Device</label>
+  <input type="button" id="enableDevice" value="Connect MIDI Device" />
   <label for="sample">Upload a sample (optional)</label>
   <input type="file" id="sample" />
   <label for="sampleNote">Select the note this sample corresponds to</label>
@@ -49,7 +51,8 @@
     font-weight: bold;
   }
 
-  .form input[type='file'] {
+  .form input[type='file'],
+  .form input[type='button'] {
     max-width: 300px;
   }
 
@@ -291,5 +294,87 @@
     }
 
     console.log(midi);
+  };
+
+  const MIDI_STATUS_NOTE_OFF = 0x8;
+  const MIDI_STATUS_NOTE_ON = 0x9;
+  const MIDI_STATUS_NOTE_AT = 0xa; // after touch
+  const MIDI_STATUS_CC = 0xb; // control change
+  const MIDI_STATUS_PGM_CHANGE = 0xc;
+  const MIDI_STATUS_CHANNEL_AT = 0xd; // after touch
+  const MIDI_STATUS_PITCH_BEND = 0xe;
+
+  const MIDI_STATUS = {
+    [0x8]: 'NOTE_OFF',
+    [0x9]: 'NOTE_ON',
+    [0xa]: 'NOTE_AT',
+    [0xb]: 'CC',
+    [0xc]: 'PGM_CHANGE',
+    [0xd]: 'CHANNEL_AT',
+    [0xe]: 'PITCH_BEND',
+  };
+
+  class MidiEvent {
+    constructor(data) {
+      this.statusRaw = (data[0] & 0xf0) >> 4;
+      this.status = MIDI_STATUS[this.statusRaw];
+      this.channel = data[0] & 0x0f;
+      this.param1 = data[1];
+      this.param2 = data[2];
+    }
+  }
+
+  document.getElementById('enableDevice').onclick = async () => {
+    /** @type {MIDIAccess} */
+    const midi = await navigator
+      .requestMIDIAccess()
+      .catch(() => location.reload());
+    navigator.permissions.query({ name: 'midi', sysex: true }).then(result => {
+      if (result.state === 'granted') {
+        // Access granted.
+        console.log('granted', result);
+      } else if (result.state === 'prompt') {
+        // Using API will prompt for permission
+        console.log('prompt', result);
+      }
+      console.log('denied', result);
+      // Permission was denied by user prompt or permission policy
+    });
+
+    for (const [entry, input] of midi.inputs) {
+      input.onmidimessage =
+        /** @param {MIDIMessageEvent} event */ function onMIDIMessage(event) {
+          const e = new MidiEvent(event.data);
+          let el, found;
+
+          switch (e.statusRaw) {
+            case MIDI_STATUS_NOTE_ON:
+              const el = document.querySelector(`[data-note="${e.param1}"]`);
+              if (el) playNote(el);
+
+              break;
+
+            case MIDI_STATUS_NOTE_OFF:
+              // not implemented
+              break;
+
+            case MIDI_STATUS_CC:
+              // not implemented
+              // (volume control)
+              if (e.param1 === 7) {
+                const _volume = e.param2 / 127;
+              }
+              break;
+          }
+        };
+
+      console.log(
+        `Input ${entry} port [type:'${input.type}']` +
+          ` id:'${input.id}'` +
+          ` manufacturer:'${input.manufacturer}'` +
+          ` name:'${input.name}'` +
+          ` version:'${input.version}'`
+      );
+    }
   };
 </script>
