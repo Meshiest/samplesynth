@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<script src="https://cdn.jsdelivr.net/npm/midi-parser-js@4.0.4/src/main.min.js"></script>
+
+<h1>Sample Synth</h1>
+<p>Click on the notes to play them, or upload a MIDI file.</p>
+
+<p class="form">
+  <label for="midifile">Upload a MIDI file</label>
+  <input type="file" id="midifile" />
+  <label for="sample">Upload a sample (optional)</label>
+  <input type="file" id="sample" />
+  <label for="sampleNote">Select the note this sample corresponds to</label>
+  <select id="sampleNote"></select>
+</p>
+
+<div class="content">
+  <div class="notes"></div>
+  <div class="metadata-container">
+    <div id="progress" class="hidden">
+      <div id="progress-bar"></div>
+    </div>
+    <pre id="metadata"></pre>
+  </div>
+</div>
+
+<style>
+  html,
+  body {
+    background-color: #ccf;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+  }
+
+  .form label {
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+
+  .form select {
+    max-width: 80px;
+  }
+
+  .content {
+    position: relative;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .metadata-container {
+    position: absolute;
+    left: 240px;
+    top: 0;
+  }
+
+  #progress {
+    height: 14px;
+    width: 120px;
+    background-color: #3d3d3d;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  #progress-bar {
+    height: 14px;
+    background-color: rgb(255, 95, 95);
+    border-radius: 4px;
+  }
+
+  .notes {
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+  }
+
+  .note {
+    display: inline-block;
+    width: 200px;
+    cursor: pointer;
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    background-color: white;
+    padding: 5px;
+  }
+
+  .note.sharp {
+    background-color: black;
+    color: white;
+  }
+
+  .note.playing {
+    background-color: #eee;
+    width: 220px;
+  }
+
+  .note.playing.sharp {
+    background-color: #333;
+  }
+</style>
+
+<script>
+  const NOTE_NAMES = [
+    'C',
+    'C#',
+    'D',
+    'D#',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'G#',
+    'A',
+    'A#',
+    'B',
+  ];
+
+  const notes = document.querySelector('.notes');
+  const sampleNotes = document.getElementById('sampleNote');
+  for (let i = 3, index = i * 12; i < 7; i++) {
+    for (let n of NOTE_NAMES) {
+      const note = document.createElement('div');
+      note.classList.add('note');
+      if (n.includes('#')) {
+        note.classList.add('sharp');
+      }
+      note.dataset.note = index++;
+      note.textContent = n + i;
+      notes.appendChild(note);
+
+      const option = document.createElement('option');
+      option.value = index - 1;
+      option.textContent = n + i;
+      sampleNotes.appendChild(option);
+    }
+  }
+
+  function noteToPitch(n) {
+    return Math.pow(2, (n - 69) / 12) * 440;
+  }
+
+  let soundData = 'la.ogg';
+  const initialNote = 12 * 4; // C4
+  sampleNotes.value = initialNote;
+  let notePitch = noteToPitch(initialNote);
+
+  /** @type {HTMLAudioElement[]} */
+  const players = [];
+  function playNote(el) {
+    let player = players.find(p => p.ended);
+    if (!player) {
+      player = new Audio();
+      players.push(player);
+    }
+
+    el.classList.add('playing');
+    console.log('Playing note:', soundData, notePitch);
+    player.src = soundData;
+    player.preservesPitch = false;
+    player.playbackRate = noteToPitch(Number(el.dataset.note)) / notePitch;
+    player.play();
+    player.onended = () => {
+      el.classList.remove('playing');
+    };
+    return player;
+  }
+
+  for (const note of document.querySelectorAll('.note')) {
+    note.onclick = () => {
+      playNote(note);
+    };
+  }
+
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  document.getElementById('sample').onchange = async e => {
+    /** @type {File} */
+    const file = e.target.files[0];
+    soundData = URL.createObjectURL(file);
+    new Audio(soundData).play();
+    console.log('Loaded sample:', soundData);
+  };
+
+  document.getElementById('sampleNote').onchange = e => {
+    notePitch = noteToPitch(Number(e.target.value));
+  };
+
+  document.getElementById('midifile').onchange = async e => {
+    /** @type {File} */
+    const file = e.target.files[0];
+    const midi = MidiParser.parse(new Uint8Array(await file.arrayBuffer()));
+    console.log('Parsed MIDI file:', midi);
+    if (!midi) {
+      document.getElementById('progress').classList.add('hidden');
+      return;
+    }
+
+    const bpm = midi.timeDivision;
+    const metadata = document.getElementById('metadata');
+    metadata.textContent = '';
+    document.getElementById('progress').classList.remove('hidden');
+
+    let overallProgress = 0;
+    const progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = '0%';
+
+    await Promise.all(
+      Array.from({ ...midi.track, length: midi.tracks }).map(
+        async ({ event: events }) => {
+          const length = events.reduce(
+            (acc, event) => acc + event.deltaTime,
+            0
+          );
+          let trackProgress = 0;
+
+          for (const event of events) {
+            await sleep((event.deltaTime / bpm) * 1000);
+            trackProgress += event.deltaTime;
+            if (trackProgress > overallProgress) {
+              overallProgress = trackProgress;
+              progressBar.style.width = `${(overallProgress / length) * 100}%`;
+            }
+
+            if (event.type === 255 && event.metaType === 3) {
+              metadata.textContent += event.data + '\n';
+            }
+
+            if (event.type === 9) {
+              const [note, volume] = event.data;
+              const el = document.querySelector(`.note[data-note="${note}"]`);
+              if (el && volume) playNote(el);
+            }
+          }
+        }
+      )
+    );
+    console.log(midi);
+  };
+</script>
