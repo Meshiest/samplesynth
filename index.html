@@ -11,6 +11,8 @@
   <input type="file" id="sample" />
   <label for="sampleNote">Select the note this sample corresponds to</label>
   <select id="sampleNote"></select>
+  <label for="volume">Volume</label>
+  <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" />
 </p>
 
 <div class="content">
@@ -41,7 +43,12 @@
     font-weight: bold;
   }
 
-  .form select {
+  .form input[type='file'] {
+    max-width: 300px;
+  }
+
+  .form select,
+  .form input[type='range'] {
     max-width: 80px;
   }
 
@@ -148,6 +155,7 @@
   const initialNote = 12 * 4; // C4
   sampleNotes.value = initialNote;
   let notePitch = noteToPitch(initialNote);
+  let noteVolume = 0.5;
 
   /** @type {HTMLAudioElement[]} */
   const players = [];
@@ -159,9 +167,9 @@
     }
 
     el.classList.add('playing');
-    console.log('Playing note:', soundData, notePitch);
     player.src = soundData;
     player.preservesPitch = false;
+    player.volume = noteVolume;
     player.playbackRate = noteToPitch(Number(el.dataset.note)) / notePitch;
     player.play();
     player.onended = () => {
@@ -190,6 +198,10 @@
     notePitch = noteToPitch(Number(e.target.value));
   };
 
+  document.getElementById('volume').oninput = e => {
+    noteVolume = e.target.value;
+  };
+
   document.getElementById('midifile').onchange = async e => {
     /** @type {File} */
     const file = e.target.files[0];
@@ -205,40 +217,70 @@
     metadata.textContent = '';
     document.getElementById('progress').classList.remove('hidden');
 
-    let overallProgress = 0;
+    let progressPercent = 0;
+    let maxTrackLength = 1;
     const progressBar = document.getElementById('progress-bar');
     progressBar.style.width = '0%';
 
-    await Promise.all(
-      Array.from({ ...midi.track, length: midi.tracks }).map(
-        async ({ event: events }) => {
-          const length = events.reduce(
-            (acc, event) => acc + event.deltaTime,
-            0
-          );
-          let trackProgress = 0;
+    const tracks = Array.from({ ...midi.track, length: midi.tracks });
 
-          for (const event of events) {
-            await sleep((event.deltaTime / bpm) * 1000);
-            trackProgress += event.deltaTime;
-            if (trackProgress > overallProgress) {
-              overallProgress = trackProgress;
-              progressBar.style.width = `${(overallProgress / length) * 100}%`;
-            }
+    // walk the tracks to find out the total midi length
+    for (const track of tracks) {
+      track.index = 0;
+      track.progress = 0;
+      maxTrackLength = Math.max(
+        maxTrackLength,
+        track.event.reduce((acc, event) => acc + event.deltaTime, 0)
+      );
+    }
 
-            if (event.type === 255 && event.metaType === 3) {
-              metadata.textContent += event.data + '\n';
-            }
+    console.log('Track length:', (maxTrackLength / bpm).toFixed(3) + 's');
 
-            if (event.type === 9) {
-              const [note, volume] = event.data;
-              const el = document.querySelector(`.note[data-note="${note}"]`);
-              if (el && volume) playNote(el);
-            }
+    const start = performance.now();
+    while (true) {
+      const secondsSinceStart = (performance.now() - start) / 1000;
+
+      progressPercent = Math.min(1, secondsSinceStart / (maxTrackLength / bpm));
+      progressBar.style.width = `${progressPercent * 100}%`;
+
+      let playing = false;
+      for (const track of tracks) {
+        // skip this track if it's already finished
+        if (track.index >= track.event.length) {
+          continue;
+        }
+        playing = true;
+
+        // iterate the notes not yet played
+        for (let i = track.index; i < track.event.length; i++) {
+          const event = track.event[i];
+
+          // if the event is in the future, exit early
+          if ((event.deltaTime + track.progress) / bpm > secondsSinceStart) {
+            break;
+          }
+
+          track.progress += event.deltaTime;
+          track.index = i + 1;
+
+          // print out metadata
+          if (event.type === 255 && event.metaType === 3) {
+            metadata.textContent += event.data + '\n';
+          }
+
+          /// play the note
+          if (event.type === 9) {
+            const [note, volume] = event.data;
+            const el = document.querySelector(`.note[data-note="${note}"]`);
+            if (el && volume) playNote(el);
           }
         }
-      )
-    );
+      }
+
+      if (!playing) break;
+      await sleep(0);
+    }
+
     console.log(midi);
   };
 </script>
