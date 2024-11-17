@@ -202,6 +202,8 @@
     noteVolume = e.target.value;
   };
 
+  let playIndex = 0;
+
   document.getElementById('midifile').onchange = async e => {
     /** @type {File} */
     const file = e.target.files[0];
@@ -211,6 +213,7 @@
       document.getElementById('progress').classList.add('hidden');
       return;
     }
+    const myIndex = ++playIndex;
 
     const bpm = midi.timeDivision;
     const metadata = document.getElementById('metadata');
@@ -237,7 +240,7 @@
     console.log('Track length:', (maxTrackLength / bpm).toFixed(3) + 's');
 
     const start = performance.now();
-    while (true) {
+    while (playIndex === myIndex) {
       const secondsSinceStart = (performance.now() - start) / 1000;
 
       progressPercent = Math.min(1, secondsSinceStart / (maxTrackLength / bpm));
