@@ -245,7 +245,7 @@
     const progressBar = document.getElementById('progress-bar');
     progressBar.style.width = '0%';
 
-    const tracks = Array.from({ ...midi.track, length: midi.tracks });
+    const tracks = midi.track;
 
     // walk the tracks to find out the total midi length
     for (const track of tracks) {
