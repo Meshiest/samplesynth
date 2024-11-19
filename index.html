@@ -1,59 +1,211 @@
 <!DOCTYPE html>
+<meta charset="utf-8" />
+<!-- screen scale meta tag -->
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0"
+/>
 <script src="https://cdn.jsdelivr.net/npm/midi-parser-js@4.0.4/src/main.min.js"></script>
 <!-- MIDI Parser, GPL Licensed. https://www.npmjs.com/package/midi-parser-js -->
 
-<h1>Sample Synth</h1>
-<p>
-  Click on the notes to play them, or upload a MIDI file. Read the code on
-  <a rel="noopener noreferer" href="https://github.com/Meshiest/samplesynth">
-    Github
-  </a>
-</p>
+<section>
+  <h1>
+    Sample Synth
+    <a
+      class="git-link"
+      rel="noopener noreferer"
+      href="https://github.com/Meshiest/samplesynth"
+    >
+      [Source Code]
+    </a>
+  </h1>
+</section>
 
-<p class="form">
-  <label for="midifile">Upload a MIDI file</label>
-  <input type="file" id="midifile" />
-  <label for="enableDevice">Connect MIDI Device</label>
-  <input type="button" id="enableDevice" value="Connect MIDI Device" />
-  <label for="sample">Upload a sample (optional)</label>
-  <input type="file" id="sample" />
-  <label for="sampleNote">Select the note this sample corresponds to</label>
-  <select id="sampleNote"></select>
-  <label for="volume">Volume</label>
-  <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" />
-</p>
+<div class="form">
+  <div class="fields">
+    <label for="midifile">Upload MIDI file</label>
+    <input type="file" id="midifile" />
+    <label for="enableDevice">Connect MIDI Device</label>
+    <input type="button" id="enableDevice" value="Connect MIDI Device" />
+    <label for="playbackSpeed">
+      Playback Speed (<span id="playbackSpeedLabel"></span>x)
+    </label>
+    <input
+      type="range"
+      id="playbackSpeed"
+      min="0.25"
+      max="4"
+      step="0.25"
+      value="1"
+    />
+  </div>
+  <div class="fields">
+    <label for="sample">Upload Audio Sample</label>
+    <input type="file" id="sample" />
+    <label for="sampleNote">Sample Sound Note</label>
+    <select id="sampleNote"></select>
+    <label for="volume">Volume</label>
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.5" />
+  </div>
+  <div class="fields">
+    <h3>How does this work?</h3>
+    <p class="desc">
+      According to music theory, musical notes have frequencies that are
+      <a
+        rel="noopener noreferer"
+        href="https://en.wikipedia.org/wiki/Twelfth_root_of_two"
+        >a 12th root of 2</a
+      >
+      apart.
+      <a
+        rel="noopener noreferer"
+        href="https://incidentnormal.github.io/2014/pitch-shift-calculations/"
+        >This website</a
+      >
+      has some formulas for doing this math. If we know the pitch of any one
+      sound, and the difference in pitches between any two notes, we can apply
+      that difference to the original note to get the desired sound.
+      <br />
+      <br />
+      When the
+      <a
+        rel="noopener noreferer"
+        href="https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/preservesPitch"
+        ><code>preservesPitch</code></a
+      >
+      property of an
+      <a
+        rel="noopener noreferer"
+        href="https://developer.mozilla.org/en-US/docs/Web/API/HTMLAudioElement"
+        ><code>Audio</code></a
+      >
+      element is set to <code>false</code>, modifying the
+      <code>playbackRate</code> to the difference in note frequencies will play
+      the intended note.
+    </p>
+  </div>
+</div>
 
 <div class="content">
   <div class="notes"></div>
   <div class="metadata-container">
     <div id="progress" class="hidden">
-      <div id="progress-bar"></div>
+      <span id="progressLabel"></span>
+      <div id="progressBar"></div>
     </div>
     <pre id="metadata"></pre>
+    <pre id="lyrics"></pre>
   </div>
 </div>
 
 <style>
+  :root {
+    --white-note-length: 200px;
+    --white-note-width: 30px;
+    --black-note-length: 140px;
+    --black-note-width: 25px;
+
+    --hover-length-inc: 10px;
+    --play-length-inc: 20px;
+
+    --fg-color: #dde;
+    --fg2-color: #99a;
+    --bg-color: #012;
+    --bg2-color: #00588b;
+  }
+
   html,
   body {
-    background-color: #ccf;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--fg-color);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+  html,
+  body {
+    height: 100%;
+    padding: 0;
+    margin: 0;
   }
 
   .form {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     margin-bottom: 20px;
+    gap: 20px;
+    margin-left: 20px;
+  }
+
+  section {
+    margin-left: 20px;
+  }
+
+  h1 {
+    margin-bottom: 0;
+  }
+
+  h1 .git-link {
+    font-size: 12px;
+  }
+
+  @media screen and (max-width: 600px) {
+    .form {
+      flex-direction: column;
+    }
+  }
+
+  .form .fields {
+    display: flex;
+    flex-direction: column;
+  }
+
+  input,
+  p {
+    color: var(--fg2-color);
+  }
+
+  a {
+    color: #66f;
+    text-decoration: none;
+  }
+  a:hover,
+  a:active,
+  a:focus {
+    text-decoration: underline;
+  }
+
+  .desc {
+    max-width: 400px;
+    margin-top: 5px;
+    font-size: 12px;
+  }
+
+  .fields h3 {
+    margin-top: 0;
+    margin-bottom: 0;
   }
 
   .form label {
     margin-bottom: 5px;
+    margin-top: 10px;
     font-weight: bold;
   }
 
   .form input[type='file'],
   .form input[type='button'] {
     max-width: 300px;
+  }
+
+  .form input[type='file'] {
+    color: var(--fg2-color);
+  }
+
+  .form input[type='button'] {
+    color: var(--bg-color);
   }
 
   .form select,
@@ -63,6 +215,10 @@
 
   .content {
     position: relative;
+    overflow-x: auto;
+    flex: 1;
+    margin: 20px;
+    margin-top: 0;
   }
 
   .hidden {
@@ -70,95 +226,132 @@
   }
 
   .metadata-container {
-    position: absolute;
-    left: 240px;
-    top: 0;
+    position: sticky;
+    left: 0;
+    top: calc(var(--white-note-length) + var(--play-length-inc) + 14px);
   }
 
   #progress {
     height: 14px;
     width: 120px;
-    background-color: #3d3d3d;
+    background-color: var(--bg2-color);
+    border: 1px solid var(--bg2-color);
     border-radius: 4px;
     overflow: hidden;
+    position: relative;
   }
 
-  #progress-bar {
+  #progressLabel {
+    font-size: 12px;
+    color: #aad;
+    font-family: monospace;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-wrap: nowrap;
+  }
+
+  #progressBar {
     height: 14px;
-    background-color: rgb(255, 95, 95);
-    border-radius: 4px;
+    background-color: var(--bg-color);
   }
 
   .notes {
     display: flex;
-    flex-direction: column;
-    width: 200px;
+    flex-direction: row;
+    height: 200px;
   }
 
   .note {
-    width: 200px;
-    cursor: pointer;
-    box-sizing: border-box;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    background-color: white;
-    padding: 5px;
     display: flex;
-    align-items: center;
-    justify-content: end;
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
+    align-items: end;
+    justify-content: center;
+
+    height: var(--white-note-length);
+    width: var(--white-note-width);
+    margin-left: -1px;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+
+    cursor: pointer;
+
+    border: 1px solid rgba(0, 0, 40, 0.5);
+    border-top: none;
+    background-color: white;
+    box-sizing: border-box;
+    outline: none;
+    padding-bottom: 4px;
+  }
+
+  .note span {
+    color: var(--bg-color);
+    opacity: 0.8;
+  }
+  .note.sharp span {
+    color: var(--fg-color);
+  }
+
+  .note:hover,
+  .note:active {
+    height: calc(var(--white-note-length) + var(--hover-length-inc));
   }
 
   .note.sharp {
-    background-color: black;
-    color: white;
-    margin-top: -12.5px;
-    height: 25px;
-    margin-bottom: -12.5px;
-    width: 140px;
+    background-color: var(--bg-color);
+    height: var(--black-note-length);
+    width: var(--black-note-width);
+    margin-left: calc(-1 * var(--black-note-width) / 2);
+    margin-right: calc(-1 * var(--black-note-width) / 2);
     z-index: 1;
   }
 
   .note.playing {
-    background-color: #eee;
-    width: 220px;
+    background-color: #eef;
+    height: calc(var(--white-note-length) + var(--play-length-inc));
+  }
+
+  .note.sharp:hover,
+  .note.sharp:active {
+    height: calc(var(--black-note-length) + var(--hover-length-inc));
   }
 
   .note.playing.sharp {
-    background-color: #333;
-    width: 160px;
+    background-color: #123;
+    height: calc(var(--black-note-length) + var(--play-length-inc));
   }
 </style>
 
 <script>
-  const NOTE_NAMES = [
-    'C',
-    'C#',
-    'D',
-    'D#',
-    'E',
-    'F',
-    'F#',
-    'G',
-    'G#',
-    'A',
-    'A#',
-    'B',
-  ];
+  const NOTE_NAMES = 'C C# D D# E F F# G G# A A# B'.split(' ');
 
-  const notes = document.querySelector('.notes');
-  const sampleNotes = document.getElementById('sampleNote');
+  const MIDI_STATUS_NOTE_OFF = 0x8;
+  const MIDI_STATUS_NOTE_ON = 0x9;
+  const MIDI_STATUS_NOTE_AT = 0xa; // after touch
+  const MIDI_STATUS_CC = 0xb; // control change
+  const MIDI_STATUS_PGM_CHANGE = 0xc;
+  const MIDI_STATUS_CHANNEL_AT = 0xd; // after touch
+  const MIDI_STATUS_PITCH_BEND = 0xe;
+
+  const $ = document.querySelector.bind(document);
+
+  const notes = $('.notes');
+  const sampleNotes = $('#sampleNote');
   for (let i = 1, index = i * 12; i < 8; i++) {
     for (let n of NOTE_NAMES) {
-      const note = document.createElement('div');
+      const note = document.createElement('button');
       note.classList.add('note');
       if (n.includes('#')) {
         note.classList.add('sharp');
       }
       if (i < 3) note.classList.add('hidden');
       note.dataset.note = index++;
-      note.textContent = n + i;
-      notes.prepend(note);
+
+      const text = document.createElement('span');
+      text.innerHTML = n.replace('#', '<sup>♯</sup>') + i;
+      note.appendChild(text);
+
+      notes.appendChild(note);
 
       const option = document.createElement('option');
       option.value = index - 1;
@@ -176,24 +369,35 @@
   sampleNotes.value = initialNote;
   let notePitch = noteToPitch(initialNote);
   let noteVolume = 0.5;
+  let playbackSpeed = 1;
+
+  $('#playbackSpeed').oninput = e => {
+    $('#playbackSpeedLabel').textContent = e.target.value;
+    playbackSpeed = Number(e.target.value);
+  };
+  $('#playbackSpeedLabel').textContent = 1;
+
+  let noteIndex = 0;
 
   /** @type {HTMLAudioElement[]} */
   const players = [];
-  function playNote(el) {
+  function playNote(el, volume = 1) {
     let player = players.find(p => p.ended);
     if (!player) {
       player = new Audio();
       players.push(player);
     }
 
+    const myIndex = ++noteIndex;
+
     el.classList.add('playing');
     player.src = soundData;
     player.preservesPitch = false;
-    player.volume = noteVolume * noteVolume;
+    player.volume = noteVolume * noteVolume * volume;
     player.playbackRate = noteToPitch(Number(el.dataset.note)) / notePitch;
     player.play();
     player.onended = () => {
-      el.classList.remove('playing');
+      if (noteIndex >= myIndex) el.classList.remove('playing');
     };
     return player;
   }
@@ -206,7 +410,7 @@
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-  document.getElementById('sample').onchange = async e => {
+  $('#sample').onchange = async e => {
     /** @type {File} */
     const file = e.target.files[0];
     soundData = URL.createObjectURL(file);
@@ -214,35 +418,40 @@
     console.log('Loaded sample:', soundData);
   };
 
-  document.getElementById('sampleNote').onchange = e => {
+  $('#sampleNote').onchange = e => {
     notePitch = noteToPitch(Number(e.target.value));
   };
 
-  document.getElementById('volume').oninput = e => {
+  $('#volume').oninput = e => {
     noteVolume = e.target.value;
   };
 
   let playIndex = 0;
 
-  document.getElementById('midifile').onchange = async e => {
+  $('#midifile').onchange = async e => {
     /** @type {File} */
     const file = e.target.files[0];
+    if (!file) return;
+
     const midi = MidiParser.parse(new Uint8Array(await file.arrayBuffer()));
     console.log('Parsed MIDI file:', midi);
     if (!midi) {
-      document.getElementById('progress').classList.add('hidden');
+      $('#progress').classList.add('hidden');
       return;
     }
     const myIndex = ++playIndex;
 
     const bpm = midi.timeDivision;
-    const metadata = document.getElementById('metadata');
+    const metadata = $('#metadata');
     metadata.textContent = '';
-    document.getElementById('progress').classList.remove('hidden');
+    $('#progress').classList.remove('hidden');
+    const lyricsEl = $('#lyrics');
+    lyricsEl.textContent = '';
+    const lyrics = [];
 
     let progressPercent = 0;
     let maxTrackLength = 1;
-    const progressBar = document.getElementById('progress-bar');
+    const progressBar = $('#progressBar');
     progressBar.style.width = '0%';
 
     const tracks = midi.track;
@@ -259,12 +468,23 @@
 
     console.log('Track length:', (maxTrackLength / bpm).toFixed(3) + 's');
 
-    const start = performance.now();
-    while (playIndex === myIndex) {
-      const secondsSinceStart = (performance.now() - start) / 1000;
+    function formatTime(seconds) {
+      const minutes = (Math.floor(seconds / 60) + '').padStart(2, ' ');
+      const s = Math.round(seconds % 60);
+      return `${minutes}:${(s + '').padStart(2, '0')}`;
+    }
 
-      progressPercent = Math.min(1, secondsSinceStart / (maxTrackLength / bpm));
-      progressBar.style.width = `${progressPercent * 100}%`;
+    let lastFrame = performance.now();
+    let elapsed = 0;
+    while (playIndex === myIndex) {
+      const deltaTime = performance.now() - lastFrame;
+      lastFrame = performance.now();
+      elapsed += (deltaTime * playbackSpeed) / 1000;
+
+      progressPercent = Math.min(1, elapsed / (maxTrackLength / bpm));
+      progressBar.style.width = `${Math.round(progressPercent * 100)}%`;
+      $('#progressLabel').textContent =
+        formatTime(elapsed) + ' / ' + formatTime(maxTrackLength / bpm);
 
       let playing = false;
       for (const track of tracks) {
@@ -279,7 +499,7 @@
           const event = track.event[i];
 
           // if the event is in the future, exit early
-          if ((event.deltaTime + track.progress) / bpm > secondsSinceStart) {
+          if ((event.deltaTime + track.progress) / bpm > elapsed) {
             break;
           }
 
@@ -287,15 +507,24 @@
           track.index = i + 1;
 
           // print out metadata
-          if (event.type === 255 && event.metaType === 3) {
-            metadata.textContent += event.data + '\n';
+          if (event.type === 255) {
+            // text based events (lyrics, track names, etc)
+            if (event.metaType >= 3 && event.metaType <= 7) {
+              if (event.metaType === 5) {
+                lyrics.push(event.data);
+                lyrics.splice(0, lyrics.length - 10);
+                lyricsEl.textContent = lyrics.join('\n');
+              } else {
+                metadata.textContent += event.data + '\n';
+              }
+            }
           }
 
           /// play the note
-          if (event.type === 9) {
+          if (event.type === MIDI_STATUS_NOTE_ON) {
             const [note, volume] = event.data;
             const el = document.querySelector(`.note[data-note="${note}"]`);
-            if (el && volume) playNote(el);
+            if (el && volume) playNote(el, volume / 127);
           }
         }
       }
@@ -307,50 +536,39 @@
     console.log(midi);
   };
 
-  const MIDI_STATUS_NOTE_OFF = 0x8;
-  const MIDI_STATUS_NOTE_ON = 0x9;
-  const MIDI_STATUS_NOTE_AT = 0xa; // after touch
-  const MIDI_STATUS_CC = 0xb; // control change
-  const MIDI_STATUS_PGM_CHANGE = 0xc;
-  const MIDI_STATUS_CHANNEL_AT = 0xd; // after touch
-  const MIDI_STATUS_PITCH_BEND = 0xe;
-
-  const MIDI_STATUS = {
-    [0x8]: 'NOTE_OFF',
-    [0x9]: 'NOTE_ON',
-    [0xa]: 'NOTE_AT',
-    [0xb]: 'CC',
-    [0xc]: 'PGM_CHANGE',
-    [0xd]: 'CHANNEL_AT',
-    [0xe]: 'PITCH_BEND',
-  };
-
   class MidiEvent {
     constructor(data) {
       this.statusRaw = (data[0] & 0xf0) >> 4;
-      this.status = MIDI_STATUS[this.statusRaw];
       this.channel = data[0] & 0x0f;
       this.param1 = data[1];
       this.param2 = data[2];
     }
   }
 
-  document.getElementById('enableDevice').onclick = async () => {
+  $('#enableDevice').onclick = async () => {
     /** @type {MIDIAccess} */
-    const midi = await navigator
-      .requestMIDIAccess()
-      .catch(() => location.reload());
-    navigator.permissions.query({ name: 'midi', sysex: true }).then(result => {
-      if (result.state === 'granted') {
-        // Access granted.
-        console.log('granted', result);
-      } else if (result.state === 'prompt') {
-        // Using API will prompt for permission
-        console.log('prompt', result);
-      }
-      console.log('denied', result);
-      // Permission was denied by user prompt or permission policy
-    });
+    const midi = await navigator.requestMIDIAccess().catch(() => null);
+    if (!midi) {
+      console.error('MIDI Rejected');
+      return;
+    }
+    const ok = await navigator.permissions
+      .query({ name: 'midi', sysex: true })
+      .then(result => {
+        if (result.state === 'granted') {
+          // Access granted.
+          return true;
+        } else if (result.state === 'prompt') {
+          // Using API will prompt for permission
+          return true;
+        } else {
+          return false;
+        }
+        // Permission was denied by user prompt or permission policy
+      });
+    if (!ok) {
+      return;
+    }
 
     for (const [entry, input] of midi.inputs) {
       input.onmidimessage =
